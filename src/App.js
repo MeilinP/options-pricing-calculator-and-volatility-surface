@@ -41,16 +41,31 @@ const calculateGreeks = (S, K, T, r, sigma, type = 'call') => {
 };
 
 // Monte Carlo simulation
-const monteCarloSimulation = (S, K, T, r, sigma, type = 'call', simulations = 10000) => {
+const monteCarloSimulation = (S, K, T, r, sigma, type = 'call', simulations = 10000, steps = 252) => {
+  const dt = T / steps;
   let payoffSum = 0;
-  
+
   for (let i = 0; i < simulations; i++) {
-    const Z = Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random());
-    const ST = S * Math.exp((r - 0.5 * sigma ** 2) * T + sigma * Math.sqrt(T) * Z);
-    const payoff = type === 'call' ? Math.max(ST - K, 0) : Math.max(K - ST, 0);
+    let St = S;
+    const pathPrices = [St];
+
+    for (let j = 0; j < steps; j++) {
+      const Z = Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random());
+      St *= Math.exp((r - 0.5 * sigma ** 2) * dt + sigma * Math.sqrt(dt) * Z);
+      pathPrices.push(St);
+    }
+
+    const ST = pathPrices[pathPrices.length - 1];
+    let payoff = 0;
+
+    if (type === 'call')         payoff = Math.max(ST - K, 0);
+    else if (type === 'put')     payoff = Math.max(K - ST, 0);
+    else if (type === 'asian_call') payoff = Math.max((pathPrices.reduce((a,b)=>a+b,0)/pathPrices.length) - K, 0);
+    else if (type === 'asian_put')  payoff = Math.max(K - (pathPrices.reduce((a,b)=>a+b,0)/pathPrices.length), 0);
+
     payoffSum += payoff;
   }
-  
+
   return Math.exp(-r * T) * (payoffSum / simulations);
 };
 
